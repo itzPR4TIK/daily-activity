@@ -1,0 +1,33 @@
+name: daily-activity
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config user.name "itzPR4TIK"
+          git config user.email "193708325+itzPR4TIK@users.noreply.github.com"
+
+      - name: Make random commits
+        run: |
+          N=$(shuf -i 3-7 -n 1)
+          TODAY=$(date -u +%F)
+          for m in $(shuf -i 10-1070 -n "$N" | sort -n); do
+            TS=$(date -u -d "$TODAY 00:00 UTC + $m minutes" +"%Y-%m-%dT%H:%M:%S+0000")
+            echo "$TS" >> activity.log
+            git add activity.log
+            GIT_AUTHOR_DATE="$TS" GIT_COMMITTER_DATE="$TS" \
+              git commit -m "chore: activity $TS"
+          done
+          git push
