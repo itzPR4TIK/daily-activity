@@ -2,15 +2,20 @@ name: daily-activity
 
 on:
   schedule:
-    - cron: "0 18 * * *"
+    - cron: "17 12 * * *"
+    - cron: "47 15 * * *"
   workflow_dispatch:
+    inputs:
+      date:
+        description: "Date to fill (YYYY-MM-DD, UTC). Leave empty for today."
+        required: false
 
 permissions:
   contents: write
 
 jobs:
   commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -20,11 +25,21 @@ jobs:
           git config user.email "193708325+itzPR4TIK@users.noreply.github.com"
 
       - name: Make random commits
+        env:
+          INPUT_DATE: ${{ github.event.inputs.date }}
         run: |
+          NOW_DAY=$(date -u +%F)
+          DAY="${INPUT_DATE:-$NOW_DAY}"
+          if [[ "$DAY" > "$NOW_DAY" ]]; then
+            echo "Future date, nothing to do"; exit 0
+          fi
+          if grep -q "^$DAY" activity.log 2>/dev/null; then
+            echo "Already done for $DAY"; exit 0
+          fi
+          if [ "$DAY" = "$NOW_DAY" ]; then MAX=690; else MAX=1430; fi
           N=$(shuf -i 3-7 -n 1)
-          TODAY=$(date -u +%F)
-          for m in $(shuf -i 10-1070 -n "$N" | sort -n); do
-            TS=$(date -u -d "$TODAY 00:00 UTC + $m minutes" +"%Y-%m-%dT%H:%M:%S+0000")
+          for m in $(shuf -i 10-"$MAX" -n "$N" | sort -n); do
+            TS=$(date -u -d "$DAY 00:00 UTC + $m minutes" +"%Y-%m-%dT%H:%M:%S+0000")
             echo "$TS" >> activity.log
             git add activity.log
             GIT_AUTHOR_DATE="$TS" GIT_COMMITTER_DATE="$TS" \
