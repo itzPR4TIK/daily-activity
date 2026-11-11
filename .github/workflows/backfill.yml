@@ -1,0 +1,54 @@
+name: backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Start date (YYYY-MM-DD)"
+        required: true
+      end:
+        description: "End date (YYYY-MM-DD)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  fill:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config user.name "itzPR4TIK"
+          git config user.email "193708325+itzPR4TIK@users.noreply.github.com"
+
+      - name: Backfill commits
+        env:
+          START: ${{ github.event.inputs.start }}
+          END: ${{ github.event.inputs.end }}
+        run: |
+          re='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          if ! [[ "$START" =~ $re && "$END" =~ $re ]]; then
+            echo "Dates must look like 2026-10-01"; exit 1
+          fi
+          NOW_DAY=$(date -u +%F)
+          D="$START"
+          while [[ ! "$D" > "$END" && ! "$D" > "$NOW_DAY" ]]; do
+            if grep -q "^$D" activity.log 2>/dev/null; then
+              echo "Skipping $D (already done)"
+            else
+              N=$(shuf -i 3-7 -n 1)
+              for m in $(shuf -i 10-1430 -n "$N" | sort -n); do
+                TS=$(date -u -d "$D 00:00 UTC + $m minutes" +"%Y-%m-%dT%H:%M:%S+0000")
+                echo "$TS" >> activity.log
+                git add activity.log
+                GIT_AUTHOR_DATE="$TS" GIT_COMMITTER_DATE="$TS" \
+                  git commit -m "chore: activity $TS"
+              done
+            fi
+            D=$(date -u -d "$D + 1 day" +%F)
+          done
+          git pull --rebase
+          git push
